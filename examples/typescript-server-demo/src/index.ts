@@ -12,7 +12,7 @@ const port = 3000;
 app.use(cors({
   origin: '*',
   exposedHeaders: ['Mcp-Session-Id'],
-  allowedHeaders: ['Content-Type', 'mcp-session-id'],
+  allowedHeaders: ['Content-Type', 'mcp-session-id', 'Accept'],
 }));
 app.use(express.json());
 
