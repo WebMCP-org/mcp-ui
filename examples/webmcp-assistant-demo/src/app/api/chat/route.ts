@@ -21,7 +21,7 @@ async function callMCPTool(toolName: string, args: Record<string, unknown> = {})
       }),
     });
 
-    const initResult = await initResponse.json();
+    await initResponse.json();
     const sessionId = initResponse.headers.get("Mcp-Session-Id");
 
     if (!sessionId) {

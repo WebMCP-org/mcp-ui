@@ -3,6 +3,7 @@
 import { Thread } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { useEdgeRuntime } from "@assistant-ui/react";
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { UIResourceRenderer, UIActionResult } from "@mcp-ui/client";
 import { useState, useRef, useEffect, createContext, useContext } from "react";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -26,20 +27,20 @@ const createProxyToolUI = (toolNames: string[], clientType: "shopping" | "analyt
   return toolNames.map((toolName) =>
     makeAssistantToolUI({
       toolName,
-      render: function ProxyTool({ result, args }) {
+      render: function ProxyTool({ result }) {
         const { shoppingClient, analyticsClient } = useContext(IframeClientContext);
         const [status, setStatus] = useState<string>("Preparing...");
-        const [toolResult, setToolResult] = useState<any>(null);
+        const [toolResult, setToolResult] = useState<unknown>(null);
 
         useEffect(() => {
           const client = clientType === "shopping" ? shoppingClient : analyticsClient;
 
-          if (!result || !(result as any)._webmcpProxy) {
+          if (!result || !(result as Record<string, unknown>)._webmcpProxy) {
             setStatus("Not a proxy tool");
             return;
           }
 
-          const proxyData = result as any;
+          const proxyData = result as Record<string, unknown> & { toolName: string; args: Record<string, unknown> };
 
           if (!client) {
             setStatus(`⚠️ ${clientType === "shopping" ? "Shopping cart" : "Analytics dashboard"} UI not visible. Please show it first.`);
@@ -59,9 +60,9 @@ const createProxyToolUI = (toolNames: string[], clientType: "shopping" | "analyt
               console.log("Proxy tool result:", toolCallResult);
               setToolResult(toolCallResult);
               setStatus(`✅ ${proxyData.toolName} completed`);
-            } catch (error: any) {
+            } catch (error: unknown) {
               console.error("Proxy tool error:", error);
-              setStatus(`❌ Error: ${error.message}`);
+              setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           };
 
@@ -80,7 +81,7 @@ const createProxyToolUI = (toolNames: string[], clientType: "shopping" | "analyt
           >
             <div style={{ fontWeight: 600, marginBottom: "6px" }}>🔄 WebMCP Tool Call</div>
             <div style={{ fontSize: "13px", color: "#666" }}>{status}</div>
-            {toolResult && (
+            {(toolResult as boolean) && (
               <div
                 style={{
                   marginTop: "8px",
@@ -93,7 +94,7 @@ const createProxyToolUI = (toolNames: string[], clientType: "shopping" | "analyt
               >
                 <strong>Result:</strong>
                 <pre style={{ margin: "4px 0 0 0", whiteSpace: "pre-wrap" }}>
-                  {JSON.stringify(toolResult, null, 2)}
+                  {JSON.stringify(toolResult as Record<string, unknown>, null, 2)}
                 </pre>
               </div>
             )}
@@ -120,7 +121,7 @@ const MCPUIToolUI = makeAssistantToolUI({
   toolName: "showShoppingCart",
   render: function ShoppingCartUI({ result }) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [tools, setTools] = useState<any[]>([]);
+    const [tools, setTools] = useState<Array<{ name: string }>>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [toolCallLog, setToolCallLog] = useState<string[]>([]);
     const clientRef = useRef<Client | null>(null);
@@ -189,9 +190,9 @@ const MCPUIToolUI = makeAssistantToolUI({
             console.warn("⚠️ Client not connected yet");
             return { success: false, error: "Client not connected" };
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("❌ Tool call failed:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
         }
       }
 
@@ -219,7 +220,7 @@ const MCPUIToolUI = makeAssistantToolUI({
               🔧 WebMCP Tools Auto-Discovered:
             </div>
             <div style={{ color: "#2e7d32", fontSize: "13px" }}>
-              {tools.map((t: any) => t.name).join(", ")}
+              {tools.map((t) => t.name).join(", ")}
             </div>
             {toolCallLog.length > 0 && (
               <div style={{ marginTop: "8px", borderTop: "1px solid #c8e6c9", paddingTop: "8px" }}>
@@ -236,7 +237,7 @@ const MCPUIToolUI = makeAssistantToolUI({
           </div>
         )}
         <UIResourceRenderer
-          resource={(result as any).content[0].resource}
+          resource={(result as { content: Array<{ resource: Parameters<typeof UIResourceRenderer>[0]['resource'] }> }).content[0].resource}
           onUIAction={handleUIAction}
           htmlProps={{
             style: {
@@ -257,7 +258,7 @@ const AnalyticsToolUI = makeAssistantToolUI({
   toolName: "showAnalyticsDashboard",
   render: function AnalyticsDashboardUI({ result }) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [tools, setTools] = useState<any[]>([]);
+    const [tools, setTools] = useState<Array<{ name: string }>>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [toolCallLog, setToolCallLog] = useState<string[]>([]);
     const clientRef = useRef<Client | null>(null);
@@ -288,7 +289,7 @@ const AnalyticsToolUI = makeAssistantToolUI({
           setTools(discoveredTools);
           setIsConnected(true);
           console.log("✅ Connected to analytics iframe, discovered tools:", discoveredTools);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error("Error connecting:", error);
         }
       }, 1000);
@@ -323,9 +324,9 @@ const AnalyticsToolUI = makeAssistantToolUI({
             console.warn("⚠️ Client not connected yet");
             return { success: false, error: "Client not connected" };
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("❌ Tool call failed:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
         }
       }
 
@@ -353,7 +354,7 @@ const AnalyticsToolUI = makeAssistantToolUI({
               🔧 WebMCP Tools Auto-Discovered:
             </div>
             <div style={{ color: "#2e7d32", fontSize: "13px" }}>
-              {tools.map((t: any) => t.name).join(", ")}
+              {tools.map((t) => t.name).join(", ")}
             </div>
             {toolCallLog.length > 0 && (
               <div style={{ marginTop: "8px", borderTop: "1px solid #c8e6c9", paddingTop: "8px" }}>
@@ -370,7 +371,7 @@ const AnalyticsToolUI = makeAssistantToolUI({
           </div>
         )}
         <UIResourceRenderer
-          resource={(result as any).content[0].resource}
+          resource={(result as { content: Array<{ resource: Parameters<typeof UIResourceRenderer>[0]['resource'] }> }).content[0].resource}
           onUIAction={handleUIAction}
           htmlProps={{
             style: {
@@ -397,9 +398,11 @@ function MyAssistant() {
 
   return (
     // @ts-expect-error - React 19 type compatibility issue
-    <IframeClientContext.Provider
-      value={{ shoppingClient, analyticsClient, setShoppingClient, setAnalyticsClient }}
-    >
+    <AssistantRuntimeProvider runtime={runtime}>
+      {/* @ts-expect-error - React 19 type compatibility issue */}
+      <IframeClientContext.Provider
+        value={{ shoppingClient, analyticsClient, setShoppingClient, setAnalyticsClient }}
+      >
       <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
         {/* Left side - MCP UI Display (takes up more space) */}
         <div
@@ -426,7 +429,7 @@ function MyAssistant() {
               </h1>
               <p style={{ opacity: 0.95, fontSize: "16px", lineHeight: "1.6" }}>
                 Chat with the AI assistant to interact with MCP-UI resources.<br />
-                <strong>Try:</strong> "Show me the shopping cart, then add 2 laptops"
+                <strong>Try:</strong> &ldquo;Show me the shopping cart, then add 2 laptops&rdquo;
               </p>
               <div
                 style={{
@@ -438,7 +441,7 @@ function MyAssistant() {
                 }}
               >
                 <strong>✨ New:</strong> The AI can now call WebMCP tools inside iframes!<br />
-                Try: "Add a laptop to cart" or "Get cart contents"
+                Try: &ldquo;Add a laptop to cart&rdquo; or &ldquo;Get cart contents&rdquo;
               </div>
             </div>
 
@@ -494,7 +497,7 @@ function MyAssistant() {
             <p style={{ fontSize: "14px", color: "#666", lineHeight: "1.5" }}>
               Ask me to show interfaces and interact with them!<br />
               <span style={{ fontSize: "12px", color: "#999" }}>
-                Example: "Show cart, then add 2 smartphones"
+                Example: &ldquo;Show cart, then add 2 smartphones&rdquo;
               </span>
             </p>
           </div>
@@ -506,6 +509,7 @@ function MyAssistant() {
         </div>
       </div>
     </IframeClientContext.Provider>
+    </AssistantRuntimeProvider>
   );
 }
 
